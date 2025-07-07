@@ -1,4 +1,3 @@
---prefer-binary
-aiohttp==3.9.0b0
 aiogram==2.25.1
 python-dotenv==0.21.0
+aiohttp==3.9.0b0
