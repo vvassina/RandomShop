@@ -1,2 +1,4 @@
+--prefer-binary
+aiohttp==3.8.5
 aiogram==2.25.1
 python-dotenv==0.21.0
