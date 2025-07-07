@@ -1,2 +1,12 @@
 [project]
+name = "RandomShop BOT"
+version = "0.1.0"
+description = "Telegram bot"
 requires-python = ">=3.11,<3.12"
+authors = [
+    { name = "vvassina", email = "vvassinae@yandex.ru" }
+]
+dependencies = [
+    "aiogram>=3.0", 
+    "python-dotenv",
+]
