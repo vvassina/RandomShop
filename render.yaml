@@ -1,11 +1,11 @@
 services:
   - type: web
-    name: RandomShop BOT
+    name: my-telegram-bot
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
     envVars:
-  - key: PYTHON_VERSION
-    value: 3.11.9
+      - key: PYTHON_VERSION
+        value: 3.11.9
     autoDeploy: true
