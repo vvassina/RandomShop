@@ -1,8 +1,6 @@
 import logging
 import os
 import re
-import asyncio
-from aiohttp import web
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
@@ -112,27 +110,6 @@ async def handle_buttons(message: types.Message):
         kb.add(InlineKeyboardButton("Написать менеджеру", url="https://t.me/dadmaksi"))
         await message.answer("Свяжитесь с менеджером для оформления:", reply_markup=kb)
 
-
-# --- aiohttp web server для Render ---
-
-async def handle_root(request):
-    return web.Response(text="Bot is running!")
-
-async def start_web_server():
-    app = web.Application()
-    app.router.add_get("/", handle_root)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    port = int(os.environ.get("PORT", 8000))
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    logging.info(f"Web server started on port {port}")
-
-# --- Главная корутина запуска ---
-
-async def main():
-    await start_web_server()
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+if _name_ == '_main_':
+    import asyncio
+    asyncio.run(dp.start_polling(bot))
