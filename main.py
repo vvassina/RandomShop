@@ -1,25 +1,18 @@
 import logging
 import os
-import re
-import asyncio
-from aiohttp import web
-
-from aiogram import Bot, Dispatcher, types, F
+from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.utils import executor
 from dotenv import load_dotenv
 
 load_dotenv()
 
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+bot = Bot(token=TOKEN)
+dp = Dispatcher(bot)
 logging.basicConfig(level=logging.INFO)
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-if not TOKEN:
-    logging.error("TELEGRAM_BOT_TOKEN is not set in environment variables")
-    exit(1)
-
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
-
+# Категории и фиксированные комиссии (в рублях)
 CATEGORY_FEES = {
     "Обувь/Куртки": 1000,
     "Джинсы/Кофты": 800,
@@ -30,16 +23,16 @@ CATEGORY_FEES = {
     "Техника/Другое": 0
 }
 
+# Глобальные переменные
 current_category = None
 yuan_rate = 11.5
 
+# Клавиатуры
 def get_main_menu():
     return ReplyKeyboardMarkup(resize_keyboard=True).add(*[KeyboardButton(cat) for cat in CATEGORY_FEES])
 
-@dp.message(F.commands == ["start"])
+@dp.message_handler(commands=['start'])
 async def start(message: types.Message):
-    global current_category
-    current_category = None
     try:
         with open("start.jpg", "rb") as photo:
             await bot.send_photo(
@@ -52,7 +45,7 @@ async def start(message: types.Message):
         logging.error(f"Error sending photo: {e}")
         await message.answer("Добро пожаловать! Используйте меню ниже:", reply_markup=get_main_menu())
 
-@dp.message(F.text.in_(CATEGORY_FEES))
+@dp.message_handler(lambda message: message.text in CATEGORY_FEES)
 async def handle_category(message: types.Message):
     global current_category
     current_category = message.text
@@ -74,9 +67,8 @@ async def handle_category(message: types.Message):
         logging.error(f"Error sending price input photo: {e}")
         await message.answer("Введите стоимость в юанях (¥):")
 
-@dp.message(lambda message: current_category and re.fullmatch(r"[\d.,]+", message.text))
+@dp.message_handler(lambda message: current_category and message.text.replace(',', '').replace('.', '').isdigit())
 async def calculate_total(message: types.Message):
-    global yuan_rate
     try:
         yuan = float(message.text.replace(",", "."))
         fixed_fee = CATEGORY_FEES[current_category]
@@ -98,17 +90,17 @@ async def calculate_total(message: types.Message):
         logging.error(f"Calculation error: {e}")
         await message.answer("Ошибка расчёта. Попробуйте снова.")
 
-@dp.message(F.text.regexp(r"^set yuan\s+\d+(\.\d+)?$", flags=re.IGNORECASE))
+@dp.message_handler(lambda message: message.text.lower().startswith("set yuan"))
 async def set_yuan_rate(message: types.Message):
     global yuan_rate
     try:
         new_rate = float(message.text.split()[-1].replace(",", "."))
         yuan_rate = new_rate
         await message.answer(f"Новый курс юаня установлен: {yuan_rate} ₽")
-    except Exception:
+    except:
         await message.answer("Неверный формат. Пример: set yuan 11.7")
 
-@dp.message(F.text.in_(["Вернуться в начало", "Оформить заказ!🔥"]))
+@dp.message_handler(lambda message: message.text in ["Вернуться в начало", "Оформить заказ!🔥"])
 async def handle_buttons(message: types.Message):
     if message.text == "Вернуться в начало":
         await start(message)
@@ -117,26 +109,5 @@ async def handle_buttons(message: types.Message):
         kb.add(InlineKeyboardButton("Написать менеджеру", url="https://t.me/dadmaksi"))
         await message.answer("Свяжитесь с менеджером для оформления:", reply_markup=kb)
 
-# --- aiohttp web server для Render ---
-
-async def handle_root(request):
-    return web.Response(text="Bot is running!")
-
-async def start_web_server():
-    app = web.Application()
-    app.router.add_get("/", handle_root)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    port = int(os.environ.get("PORT", 8000))
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    logging.info(f"Web server started on port {port}")
-
-# --- Главная корутина запуска ---
-
-async def main():
-    await start_web_server()
-    await dp.start_polling(bot)
-
-if _name_ == "_main_":
-    asyncio.run(main())
+if name == 'main':
+    executor.start_polling(dp, skip_updates=True)
