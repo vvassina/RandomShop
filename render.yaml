@@ -8,4 +8,6 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: PORT
+        value: 8000
     autoDeploy: true
