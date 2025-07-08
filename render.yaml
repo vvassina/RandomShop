@@ -1,4 +1,9 @@
-build:
-  pythonVersion: 3.11.9
-  buildCommand: pip install -r requirements.txt
-start: python main.py
+services:
+  - type: web
+    name: RandomShop BOT
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    pythonVersion: 3.11.9
+    autoDeploy: true
