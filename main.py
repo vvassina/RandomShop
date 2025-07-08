@@ -25,25 +25,7 @@ CATEGORY_FEES = {
 }
 
 current_category = None
-yuan_rate_file = "yuan_rate.txt"
-
-def load_yuan_rate():
-    if os.path.exists(yuan_rate_file):
-        try:
-            with open(yuan_rate_file, "r") as f:
-                return float(f.read().strip())
-        except Exception as e:
-            logging.error(f"Ошибка чтения курса юаня из файла: {e}")
-    return 11.5  # курс по умолчанию
-
-def save_yuan_rate(rate):
-    try:
-        with open(yuan_rate_file, "w") as f:
-            f.write(str(rate))
-    except Exception as e:
-        logging.error(f"Ошибка записи курса юаня в файл: {e}")
-
-yuan_rate = load_yuan_rate()
+yuan_rate = float(os.getenv("YUAN_RATE", 11.5))  # загружается из переменной окружения
 
 def get_main_menu():
     return ReplyKeyboardMarkup(resize_keyboard=True).add(*[KeyboardButton(cat) for cat in CATEGORY_FEES])
@@ -113,8 +95,12 @@ async def set_yuan_rate(message: types.Message):
     try:
         new_rate = float(message.text.split()[-1].replace(",", "."))
         yuan_rate = new_rate
-        save_yuan_rate(new_rate)
-        await message.answer(f"Новый курс юаня установлен: {yuan_rate} ₽ и сохранён.")
+        await message.answer(
+            f"Новый курс юаня установлен: {yuan_rate} ₽ ✅\n\n"
+            f"⚠ ВНИМАНИЕ: это временный курс. "
+            f"При перезапуске он сбросится.\n"
+            f"Чтобы сохранить навсегда — зайди на Render и измени переменную YUAN_RATE."
+        )
     except:
         await message.answer("Неверный формат. Пример: set yuan 11.7")
 
@@ -127,8 +113,7 @@ async def handle_buttons(message: types.Message):
         kb.add(InlineKeyboardButton("Написать менеджеру", url="https://t.me/dadmaksi"))
         await message.answer("Свяжитесь с менеджером для оформления:", reply_markup=kb)
 
-# --- aiohttp сервер, чтобы Render увидел порт ---
-
+# --- Web-сервер для Render ---
 async def handle(request):
     return web.Response(text="Bot is running")
 
@@ -146,5 +131,5 @@ async def main():
     await start_webserver()
     await dp.start_polling()
 
-if __name__ == '__main__':
+if _name_ == '_main_':
     asyncio.run(main())
