@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: my-telegram-bot
+    name: RandomShop BOT
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
