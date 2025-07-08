@@ -2,7 +2,6 @@ import logging
 import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
-from aiogram.utils import executor
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,7 +11,6 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 logging.basicConfig(level=logging.INFO)
 
-# Категории и фиксированные комиссии (в рублях)
 CATEGORY_FEES = {
     "Обувь/Куртки": 1000,
     "Джинсы/Кофты": 800,
@@ -23,16 +21,16 @@ CATEGORY_FEES = {
     "Техника/Другое": 0
 }
 
-# Глобальные переменные
 current_category = None
 yuan_rate = 11.5
 
-# Клавиатуры
 def get_main_menu():
     return ReplyKeyboardMarkup(resize_keyboard=True).add(*[KeyboardButton(cat) for cat in CATEGORY_FEES])
 
-@dp.message_handler(commands=['start'])
+@dp.message(commands=['start'])
 async def start(message: types.Message):
+    global current_category
+    current_category = None
     try:
         with open("start.jpg", "rb") as photo:
             await bot.send_photo(
@@ -45,7 +43,7 @@ async def start(message: types.Message):
         logging.error(f"Error sending photo: {e}")
         await message.answer("Добро пожаловать! Используйте меню ниже:", reply_markup=get_main_menu())
 
-@dp.message_handler(lambda message: message.text in CATEGORY_FEES)
+@dp.message(lambda message: message.text in CATEGORY_FEES)
 async def handle_category(message: types.Message):
     global current_category
     current_category = message.text
@@ -67,7 +65,7 @@ async def handle_category(message: types.Message):
         logging.error(f"Error sending price input photo: {e}")
         await message.answer("Введите стоимость в юанях (¥):")
 
-@dp.message_handler(lambda message: current_category and message.text.replace(',', '').replace('.', '').isdigit())
+@dp.message(lambda message: current_category and message.text.replace(',', '').replace('.', '').isdigit())
 async def calculate_total(message: types.Message):
     try:
         yuan = float(message.text.replace(",", "."))
@@ -90,7 +88,7 @@ async def calculate_total(message: types.Message):
         logging.error(f"Calculation error: {e}")
         await message.answer("Ошибка расчёта. Попробуйте снова.")
 
-@dp.message_handler(lambda message: message.text.lower().startswith("set yuan"))
+@dp.message(lambda message: message.text.lower().startswith("set yuan"))
 async def set_yuan_rate(message: types.Message):
     global yuan_rate
     try:
@@ -100,7 +98,7 @@ async def set_yuan_rate(message: types.Message):
     except:
         await message.answer("Неверный формат. Пример: set yuan 11.7")
 
-@dp.message_handler(lambda message: message.text in ["Вернуться в начало", "Оформить заказ!🔥"])
+@dp.message(lambda message: message.text in ["Вернуться в начало", "Оформить заказ!🔥"])
 async def handle_buttons(message: types.Message):
     if message.text == "Вернуться в начало":
         await start(message)
@@ -109,5 +107,6 @@ async def handle_buttons(message: types.Message):
         kb.add(InlineKeyboardButton("Написать менеджеру", url="https://t.me/dadmaksi"))
         await message.answer("Свяжитесь с менеджером для оформления:", reply_markup=kb)
 
-if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+if _name_ == '_main_':
+    import asyncio
+    asyncio.run(dp.start_polling())
