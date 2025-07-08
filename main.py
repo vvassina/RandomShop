@@ -1,6 +1,6 @@
 import logging
 import os
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from dotenv import load_dotenv
 
@@ -22,7 +22,6 @@ CATEGORY_FEES = {
     "Техника/Другое": 0
 }
 
-# Сделаем current_category и yuan_rate глобальными, храним в памяти через объект
 class State:
     current_category = None
     yuan_rate = 11.5
@@ -32,7 +31,8 @@ state = State()
 def get_main_menu():
     return ReplyKeyboardMarkup(resize_keyboard=True).add(*[KeyboardButton(cat) for cat in CATEGORY_FEES])
 
-@dp.message(commands=["start"])
+# Хэндлер команды /start
+@dp.message(F.commands == ["start"])
 async def start_handler(message: types.Message):
     state.current_category = None
     try:
@@ -47,11 +47,9 @@ async def start_handler(message: types.Message):
         logging.error(f"Error sending photo: {e}")
         await message.answer("Добро пожаловать! Используйте меню ниже:", reply_markup=get_main_menu())
 
-@dp.message()
+# Хэндлер выбора категории
+@dp.message(F.text.in_(CATEGORY_FEES.keys()))
 async def handle_category(message: types.Message):
-    if message.text not in CATEGORY_FEES:
-        return  # Игнорируем, если текст не категория
-    
     state.current_category = message.text
 
     if state.current_category == "Техника/Другое":
@@ -71,16 +69,17 @@ async def handle_category(message: types.Message):
         logging.error(f"Error sending price input photo: {e}")
         await message.answer("Введите стоимость в юанях (¥):")
 
+# Хэндлер для расчёта цены — проверяем, что текст — число и выбрана категория
 @dp.message()
 async def calculate_total(message: types.Message):
     if state.current_category is None:
         return
-    # Проверяем, что текст — число (цена в юанях)
+
     text = message.text.replace(",", ".")
     try:
         yuan = float(text)
     except ValueError:
-        return  # Не число — игнорируем
+        return
 
     fixed_fee = CATEGORY_FEES[state.current_category]
     rub_no_fee = round(yuan * state.yuan_rate, 2)
@@ -98,10 +97,9 @@ async def calculate_total(message: types.Message):
         reply_markup=markup
     )
 
-@dp.message()
+# Хэндлер установки курса юаня
+@dp.message(F.text.regexp(r"^set yuan\s+\d+(\.\d+)?$", flags=0, ignore_case=True))
 async def set_yuan_rate(message: types.Message):
-    if not message.text.lower().startswith("set yuan"):
-        return
     try:
         new_rate = float(message.text.split()[-1].replace(",", "."))
         state.yuan_rate = new_rate
@@ -109,11 +107,9 @@ async def set_yuan_rate(message: types.Message):
     except Exception:
         await message.answer("Неверный формат. Пример: set yuan 11.7")
 
-@dp.message()
+# Хэндлер кнопок
+@dp.message(F.text.in_(["Вернуться в начало", "Оформить заказ!🔥"]))
 async def handle_buttons(message: types.Message):
-    if message.text not in ["Вернуться в начало", "Оформить заказ!🔥"]:
-        return
-
     if message.text == "Вернуться в начало":
         await start_handler(message)
     else:
