@@ -109,5 +109,5 @@ async def handle_buttons(message: types.Message):
         kb.add(InlineKeyboardButton("Написать менеджеру", url="https://t.me/dadmaksi"))
         await message.answer("Свяжитесь с менеджером для оформления:", reply_markup=kb)
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
