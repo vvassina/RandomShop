@@ -1,8 +1,2 @@
 [project]
-name = "RandomShop BOT"
 requires-python = ">=3.11,<3.12"
-dependencies = ["aiogram>=3.0"]
-
-[build-system]
-requires = ["setuptools>=65.0"]
-build-backend = "setuptools.build_meta"
