@@ -25,7 +25,25 @@ CATEGORY_FEES = {
 }
 
 current_category = None
-yuan_rate = 11.5
+yuan_rate_file = "yuan_rate.txt"
+
+def load_yuan_rate():
+    if os.path.exists(yuan_rate_file):
+        try:
+            with open(yuan_rate_file, "r") as f:
+                return float(f.read().strip())
+        except Exception as e:
+            logging.error(f"Ошибка чтения курса юаня из файла: {e}")
+    return 11.5  # курс по умолчанию
+
+def save_yuan_rate(rate):
+    try:
+        with open(yuan_rate_file, "w") as f:
+            f.write(str(rate))
+    except Exception as e:
+        logging.error(f"Ошибка записи курса юаня в файл: {e}")
+
+yuan_rate = load_yuan_rate()
 
 def get_main_menu():
     return ReplyKeyboardMarkup(resize_keyboard=True).add(*[KeyboardButton(cat) for cat in CATEGORY_FEES])
@@ -95,7 +113,8 @@ async def set_yuan_rate(message: types.Message):
     try:
         new_rate = float(message.text.split()[-1].replace(",", "."))
         yuan_rate = new_rate
-        await message.answer(f"Новый курс юаня установлен: {yuan_rate} ₽")
+        save_yuan_rate(new_rate)
+        await message.answer(f"Новый курс юаня установлен: {yuan_rate} ₽ и сохранён.")
     except:
         await message.answer("Неверный формат. Пример: set yuan 11.7")
 
