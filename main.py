@@ -1,8 +1,9 @@
 import logging
 import os
+import asyncio
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
-from aiogram.utils import executor
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,11 +24,9 @@ CATEGORY_FEES = {
     "Техника/Другое": 0
 }
 
-# Глобальные переменные
 current_category = None
 yuan_rate = 11.5
 
-# Клавиатуры
 def get_main_menu():
     return ReplyKeyboardMarkup(resize_keyboard=True).add(*[KeyboardButton(cat) for cat in CATEGORY_FEES])
 
@@ -109,5 +108,24 @@ async def handle_buttons(message: types.Message):
         kb.add(InlineKeyboardButton("Написать менеджеру", url="https://t.me/dadmaksi"))
         await message.answer("Свяжитесь с менеджером для оформления:", reply_markup=kb)
 
-if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+# --- aiohttp сервер, чтобы Render увидел порт ---
+
+async def handle(request):
+    return web.Response(text="Bot is running")
+
+async def start_webserver():
+    app = web.Application()
+    app.add_routes([web.get('/', handle)])
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 8000))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    logging.info(f"Webserver started on port {port}")
+
+async def main():
+    await start_webserver()
+    await dp.start_polling()
+
+if _name_ == '_main_':
+    asyncio.run(main())
