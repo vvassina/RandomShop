@@ -309,7 +309,7 @@ async def back_after_confirm(message: types.Message, state: FSMContext):
 @dp.message_handler(lambda m: m.text == "Вернуться в начало", state="*")
 async def go_to_start(message: types.Message, state: FSMContext):
     await state.finish()
-    await start(message)
+    await start(message, state)
 
 # --- Web-сервер для Render ---
 async def handle(request):
