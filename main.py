@@ -3,7 +3,11 @@ import os
 import asyncio
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from aiogram.types import (
+    ReplyKeyboardMarkup, KeyboardButton,
+    InlineKeyboardButton, InlineKeyboardMarkup,
+    InputMediaPhoto
+)
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
@@ -17,172 +21,250 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 logging.basicConfig(level=logging.INFO)
 
-yuan_rate = float(os.getenv("YUAN_RATE", 11.5))  # курс юаня
+# Курс юаня
+yuan_rate = float(os.getenv("YUAN_RATE", 11.5))
 
-# FSM для оформления заказа
-class ConfirmOrderStates(StatesGroup):
-    waiting_for_screenshot = State()
-    waiting_for_size = State()
-    waiting_for_price = State()
-    waiting_for_confirmation = State()
+# Категории и комиссии (для "Рассчитать стоимость 💴")
+CATEGORY_FEES = {
+    "Обувь/Куртки": 1000,
+    "Джинсы/Кофты": 800,
+    "Штаны/Юбки/Платья": 600,
+    "Футболки/Аксессуары": 600,
+    "Часы/Украшения": 1000,
+    "Сумки/Рюкзаки": 900,
+    "Техника/Другое": 0
+}
 
-def get_main_menu():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(KeyboardButton("Рассчитать стоимость заказа"), KeyboardButton("Оформить заказ"))
-    return markup
+# FSM для оформления заказа (фото, размер, цена, подтверждение)
+class OrderStates(StatesGroup):
+    waiting_screenshot = State()
+    waiting_size = State()
+    waiting_price = State()
+    waiting_confirmation = State()
 
-def get_edit_markup():
-    markup = InlineKeyboardMarkup(row_width=1)
-    markup.add(
+# FSM для расчёта стоимости (категория, цена, итог)
+class CalcStates(StatesGroup):
+    waiting_category = State()
+    waiting_price = State()
+
+# Главное меню
+def main_menu():
+    kb = ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add(KeyboardButton("Рассчитать стоимость заказа 💴"))
+    kb.add(KeyboardButton("Оформить заказ 🛍"))
+    return kb
+
+# Категории для расчёта стоимости
+def categories_menu():
+    kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    for cat in CATEGORY_FEES.keys():
+        kb.add(KeyboardButton(cat))
+    return kb
+
+# Кнопки редактирования заказа (в один столбик)
+def edit_order_markup():
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(
         InlineKeyboardButton("Изменить скрин", callback_data="edit_screenshot"),
         InlineKeyboardButton("Изменить размер", callback_data="edit_size"),
         InlineKeyboardButton("Изменить стоимость", callback_data="edit_price"),
         InlineKeyboardButton("✅ Всё верно", callback_data="confirm_order")
     )
-    return markup
+    return kb
 
-def get_manager_button():
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("Написать менеджеру", url="https://t.me/dadmaksi"))
-    return markup
+# Кнопка менеджера
+def manager_button():
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("Написать менеджеру", url="https://t.me/dadmaksi"))
+    return kb
 
-# Старт бота
+# --- Обработчики ---
+
 @dp.message_handler(commands=["start"])
-async def start(message: types.Message):
+async def cmd_start(message: types.Message):
     try:
         with open("start.jpg", "rb") as photo:
             await bot.send_photo(
                 message.chat.id,
                 photo,
-                caption="Привет!👋🏼\n\nЯ помогу Вам рассчитать стоимость заказа и оформить заказ!",
-                reply_markup=get_main_menu()
+                caption="Привет! 👋🏼\n\nЯ помогу рассчитать стоимость заказа или оформить заказ.",
+                reply_markup=main_menu()
             )
     except Exception as e:
         logging.error(f"Error sending start photo: {e}")
-        await message.answer("Привет! Выберите действие:", reply_markup=get_main_menu())
+        await message.answer("Привет! Выберите действие:", reply_markup=main_menu())
 
-# Обработка главного меню
-@dp.message_handler(lambda message: message.text == "Рассчитать стоимость заказа")
-async def start_cost_calc(message: types.Message):
-    await message.answer("Этот функционал пока не реализован, используйте оформление заказа.")
-    # Здесь можно вставить текущий функционал расчёта стоимости
+# Главное меню — обработка выбора
+@dp.message_handler(lambda m: m.text in ["Рассчитать стоимость заказа 💴", "Оформить заказ 🛍"])
+async def handle_main_menu(message: types.Message, state: FSMContext):
+    if message.text == "Рассчитать стоимость заказа 💴":
+        await message.answer("Выберите категорию товара:", reply_markup=categories_menu())
+        await CalcStates.waiting_category.set()
+    else:
+        await message.answer("Пришлите скрин товара:")
+        await OrderStates.waiting_screenshot.set()
 
-@dp.message_handler(lambda message: message.text == "Оформить заказ")
-async def start_order(message: types.Message, state: FSMContext):
+# === Ветка расчёта стоимости ===
+
+@dp.message_handler(state=CalcStates.waiting_category)
+async def calc_category_chosen(message: types.Message, state: FSMContext):
+    category = message.text
+    if category not in CATEGORY_FEES:
+        await message.answer("Пожалуйста, выберите категорию из списка.")
+        return
+    await state.update_data(category=category)
+    if category == "Техника/Другое":
+        await message.answer(
+            "Такое считаем индивидуально. Напишите нашему менеджеру 😊",
+            reply_markup=manager_button()
+        )
+        await state.finish()
+        return
+    # Отправляем три картинки с подсказками цен
+    media = []
+    for fname in ["order_price_1.jpg", "order_price_2.jpg", "order_price_3.jpg"]:
+        try:
+            media.append(InputMediaPhoto(open(fname, "rb")))
+        except Exception as e:
+            logging.error(f"Cannot open image {fname}: {e}")
+    if media:
+        await bot.send_media_group(message.chat.id, media)
+    await message.answer("Введите стоимость товара в юанях (только цифры):")
+    await CalcStates.waiting_price.set()
+
+@dp.message_handler(state=CalcStates.waiting_price)
+async def calc_price_entered(message: types.Message, state: FSMContext):
+    text = message.text.replace(",", ".").strip()
+    try:
+        price_yuan = float(text)
+    except:
+        await message.answer("Введите стоимость числом, например: 1500")
+        return
+    data = await state.get_data()
+    category = data["category"]
+    fee = CATEGORY_FEES[category]
+    rub_no_fee = round(price_yuan * yuan_rate, 2)
+    rub_total = rub_no_fee + fee
+
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(KeyboardButton("Оформить заказ!🔥"))
+    markup.add(KeyboardButton("Вернуться в начало"))
+
+    await message.answer(
+        f"💸 Итоговая сумма: {rub_total} ₽\n\n"
+        f"🔹 Стоимость: ¥{price_yuan} × {yuan_rate} ₽ = {rub_no_fee} ₽\n"
+        f"🔹 Комиссия: {fee} ₽\n\n"
+        f"🚚 Условия доставки:\n"
+        f"600₽/кг до Владивостока, далее по тарифу CDEK/Почты России.\n\n"
+        f"📦 Точную стоимость доставки скажет менеджер, когда заказ прибудет во Владивосток!",
+        reply_markup=markup
+    )
+    await state.finish()
+
+@dp.message_handler(lambda m: m.text == "Вернуться в начало")
+async def return_to_start(message: types.Message):
+    await message.answer("Вы вернулись в главное меню.", reply_markup=main_menu())
+
+@dp.message_handler(lambda m: m.text == "Оформить заказ!🔥")
+async def go_to_order(message: types.Message):
     await message.answer("Пришлите скрин товара:")
-    await ConfirmOrderStates.waiting_for_screenshot.set()
+    await OrderStates.waiting_screenshot.set()
 
-# Приём скрина
-@dp.message_handler(state=ConfirmOrderStates.waiting_for_screenshot, content_types=types.ContentType.PHOTO)
-async def order_screenshot_received(message: types.Message, state: FSMContext):
+# === Ветка оформления заказа ===
+
+@dp.message_handler(state=OrderStates.waiting_screenshot, content_types=types.ContentType.PHOTO)
+async def order_received_screenshot(message: types.Message, state: FSMContext):
     photo = message.photo[-1]
     await state.update_data(screenshot=photo.file_id)
-    await message.answer("Напишите размер (может быть буквенным или числовым). Если размера нет, пришлите 0.")
-    await ConfirmOrderStates.waiting_for_size.set()
+    await message.answer("Напишите размер (может быть буквенным или числовым). Если размера нет — пришлите 0.")
+    await OrderStates.waiting_size.set()
 
-@dp.message_handler(state=ConfirmOrderStates.waiting_for_screenshot, content_types=types.ContentType.ANY)
-async def invalid_screenshot(message: types.Message):
-    await message.answer("Пожалуйста, пришлите именно фото товара.")
+@dp.message_handler(state=OrderStates.waiting_screenshot)
+async def order_wrong_screenshot(message: types.Message):
+    await message.answer("Пожалуйста, пришлите фото товара.")
 
-# Приём размера
-@dp.message_handler(state=ConfirmOrderStates.waiting_for_size)
-async def order_size_received(message: types.Message, state: FSMContext):
+@dp.message_handler(state=OrderStates.waiting_size)
+async def order_received_size(message: types.Message, state: FSMContext):
     size = message.text.strip()
     await state.update_data(size=size)
 
-    # Отправляем три картинки с подсказками по цене одним сообщением
     media = []
-    for filename in ["order_price_1.jpg", "order_price_2.jpg", "order_price_3.jpg"]:
+    for fname in ["order_price_1.jpg", "order_price_2.jpg", "order_price_3.jpg"]:
         try:
-            media.append(InputMediaPhoto(open(filename, "rb")))
+            media.append(InputMediaPhoto(open(fname, "rb")))
         except Exception as e:
-            logging.error(f"Cannot open image {filename}: {e}")
-
+            logging.error(f"Cannot open image {fname}: {e}")
     if media:
         await bot.send_media_group(message.chat.id, media)
 
     await message.answer("Введите стоимость товара в юанях (только цифры):")
-    await ConfirmOrderStates.waiting_for_price.set()
+    await OrderStates.waiting_price.set()
 
-# Приём цены и формирование итогового сообщения без шага телефона
-@dp.message_handler(state=ConfirmOrderStates.waiting_for_price)
-async def order_price_received(message: types.Message, state: FSMContext):
+@dp.message_handler(state=OrderStates.waiting_price)
+async def order_received_price(message: types.Message, state: FSMContext):
     text = message.text.replace(",", ".").strip()
     try:
         price_yuan = float(text)
-        await state.update_data(price_yuan=price_yuan)
-        data = await state.get_data()
+    except:
+        await message.answer("Введите стоимость числом, например: 1500")
+        return
 
-        rub_no_fee = round(price_yuan * yuan_rate, 2)
-        rub_total = rub_no_fee
-
-        caption = (
-            f"📋 Итог заказа:\n"
-            f"-------------------\n"
-            f"📸 Скрин: (отправлено ниже)\n"
-            f"📏 Размер: {data.get('size')}\n"
-            f"💴 Стоимость: ¥{price_yuan}\n\n"
-            f"💸 Итоговая сумма: {rub_total} ₽ (курс {yuan_rate} ₽/¥)\n\n"
-            f"🚚 Условия доставки:\n"
-            f"600₽/кг до Владивостока, далее по тарифу CDEK/Почты России.\n\n"
-            f"📦 Точную стоимость доставки скажет менеджер, когда заказ прибудет во Владивосток."
-        )
-
-        await bot.send_photo(message.chat.id, data.get("screenshot"), caption=caption, reply_markup=get_edit_markup())
-        await ConfirmOrderStates.waiting_for_confirmation.set()
-
-    except ValueError:
-        await message.answer("Пожалуйста, введите стоимость только цифрами, например: 1500")
-
-# Обработка кнопок редактирования и подтверждения
-@dp.callback_query_handler(state=ConfirmOrderStates.waiting_for_confirmation)
-async def edit_order_callbacks(call: types.CallbackQuery, state: FSMContext):
+    await state.update_data(price_yuan=price_yuan)
     data = await state.get_data()
 
+    rub_no_fee = round(price_yuan * yuan_rate, 2)
+    # комиссия не берём, только курс юаня
+    caption = (
+        f"📋 Итог заказа:\n"
+        f"-------------------\n"
+        f"📏 Размер: {data.get('size')}\n"
+        f"💴 Стоимость: ¥{price_yuan}\n"
+        f"💸 Итоговая сумма: {rub_no_fee} ₽ (курс {yuan_rate} ₽/¥)\n\n"
+        f"🚚 Условия доставки:\n"
+        f"600₽/кг до Владивостока, далее по тарифу CDEK/Почты России.\n\n"
+        f"📦 Точную стоимость доставки скажет менеджер, когда заказ прибудет во Владивосток."
+    )
+
+    await bot.send_photo(
+        message.chat.id,
+        data.get("screenshot"),
+        caption=caption,
+        reply_markup=edit_order_markup()
+    )
+    await OrderStates.waiting_confirmation.set()
+
+# Обработка кнопок редактирования и подтверждения заказа
+@dp.callback_query_handler(state=OrderStates.waiting_confirmation)
+async def order_edit_callback(call: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
     if call.data == "edit_screenshot":
         await call.message.answer("Пришлите новый скрин товара:")
-        await ConfirmOrderStates.waiting_for_screenshot.set()
+        await OrderStates.waiting_screenshot.set()
         await call.answer()
     elif call.data == "edit_size":
         await call.message.answer("Напишите новый размер (или 0, если нет):")
-        await ConfirmOrderStates.waiting_for_size.set()
+        await OrderStates.waiting_size.set()
         await call.answer()
     elif call.data == "edit_price":
         media = []
-        for filename in ["order_price_1.jpg", "order_price_2.jpg", "order_price_3.jpg"]:
+        for fname in ["order_price_1.jpg", "order_price_2.jpg", "order_price_3.jpg"]:
             try:
-                media.append(InputMediaPhoto(open(filename, "rb")))
+                media.append(InputMediaPhoto(open(fname, "rb")))
             except Exception as e:
-                logging.error(f"Cannot open image {filename}: {e}")
+                logging.error(f"Cannot open image {fname}: {e}")
         if media:
             await bot.send_media_group(call.message.chat.id, media)
         await call.message.answer("Введите новую стоимость в юанях (только цифры):")
-        await ConfirmOrderStates.waiting_for_price.set()
+        await OrderStates.waiting_price.set()
         await call.answer()
     elif call.data == "confirm_order":
         caption = call.message.caption or ""
         caption += "\n\n➡ Перешлите итоговое сообщение менеджеру для оформления заказа."
-        await call.message.edit_caption(caption=caption, reply_markup=get_manager_button())
+        await call.message.edit_caption(caption=caption, reply_markup=manager_button())
         await call.answer("Спасибо! Заказ оформлен.")
         await state.finish()
 
-# --- Обработка команд set yuan ---
-@dp.message_handler(lambda message: message.text.lower().startswith("set yuan"))
-async def set_yuan_rate(message: types.Message):
-    global yuan_rate
-    try:
-        new_rate = float(message.text.split()[-1].replace(",", "."))
-        yuan_rate = new_rate
-        await message.answer(
-            f"Новый курс юаня установлен: {yuan_rate} ₽ ✅\n\n"
-            f"⚠ ВНИМАНИЕ: это временный курс. "
-            f"При перезапуске он сбросится.\n"
-            f"Чтобы сохранить навсегда — зайдите на Render и измените переменную YUAN_RATE."
-        )
-    except:
-        await message.answer("Неверный формат. Пример: set yuan 11.7")
-
-# --- Вебсервер для Render ---
+# --- Вебсервер (Render) ---
 async def handle(request):
     return web.Response(text="Bot is running")
 
@@ -200,5 +282,5 @@ async def main():
     await start_webserver()
     await dp.start_polling()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())
