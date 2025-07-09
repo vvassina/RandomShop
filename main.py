@@ -178,7 +178,7 @@ async def handle_contact(message: types.Message, state: FSMContext):
     await show_order_summary(message, state)
     await OrderState.confirm_order.set()
 
-      from aiogram.types import InputMediaPhoto
+from aiogram.types import InputMediaPhoto
 
 async def show_order_summary(message: types.Message, state: FSMContext):
     data = await state.get_data()
