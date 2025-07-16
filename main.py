@@ -55,16 +55,17 @@ async def handle_category(message: types.Message):
         await message.answer("Такое считаем индивидуально, напишите нашему менеджеру 😊", reply_markup=kb)
         return
 
+    # Отправляем 3 картинки
     try:
-        with open("price_input.jpg", "rb") as photo:
-            await bot.send_photo(
-                message.chat.id,
-                photo,
-                caption="Введите стоимость в юанях (¥):"
-            )
+        media = types.MediaGroup()
+        media.attach_photo(types.InputFile("order_price_1.jpg"))
+        media.attach_photo(types.InputFile("order_price_2.jpg"))
+        media.attach_photo(types.InputFile("order_price_3.jpg"))
+        await bot.send_media_group(message.chat.id, media)
     except Exception as e:
-        logging.error(f"Error sending price input photo: {e}")
-        await message.answer("Введите стоимость в юанях (¥):")
+        logging.error(f"Ошибка при отправке изображений: {e}")
+
+    await message.answer("Введите стоимость товара в юанях (¥):")
 
 @dp.message_handler(lambda message: current_category and message.text.replace(',', '').replace('.', '').isdigit())
 async def calculate_total(message: types.Message):
@@ -72,18 +73,18 @@ async def calculate_total(message: types.Message):
         yuan = float(message.text.replace(",", "."))
         fixed_fee = CATEGORY_FEES[current_category]
         rub_no_fee = round(yuan * yuan_rate, 2)
-        rub = round(rub_no_fee + fixed_fee, 2)
+        total = round(rub_no_fee + fixed_fee, 2)
 
         markup = ReplyKeyboardMarkup(resize_keyboard=True)
         markup.add("Оформить заказ!🔥", "Вернуться в начало")
 
         await message.answer(
-            f"💸 Итоговая сумма: {rub} ₽\n\n"
-f"🔹 Стоимость: ¥{yuan} × {yuan_rate} ₽ = {rub_no_fee} ₽\n"
-f"🔹 Комиссия: {fixed_fee} ₽\n\n"
-f"🚚 Условия доставки:\n"
-f"600₽/кг до Владивостока, далее по тарифу CDEK/Почты России.\n\n"
-f"📦 Точную стоимость доставки скажет менеджер, когда заказ прибудет во Владивосток!",
+            f"💸 Итоговая сумма без учёта доставки: {total} ₽\n\n"
+            f"🔹 Стоимость: ¥{yuan} × {yuan_rate} ₽ = {rub_no_fee} ₽\n"
+            f"🔹 Комиссия: {fixed_fee} ₽\n\n"
+            f"🚚 Условия доставки:\n"
+            f"600₽/кг до Владивостока, далее по тарифу CDEK/Почты России.\n\n"
+            f"📦 Точную стоимость доставки скажет менеджер, когда заказ прибудет во Владивосток!",
             reply_markup=markup
         )
     except Exception as e:
@@ -98,7 +99,7 @@ async def set_yuan_rate(message: types.Message):
         yuan_rate = new_rate
         await message.answer(
             f"Новый курс юаня установлен: {yuan_rate} ₽ ✅\n\n"
-            f"⚠ ВНИМАНИЕ: это временный курс. "
+            f"⚠️ ВНИМАНИЕ: это временный курс. "
             f"При перезапуске он сбросится.\n"
             f"Чтобы сохранить навсегда — зайди на Render и измени переменную YUAN_RATE."
         )
