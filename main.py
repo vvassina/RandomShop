@@ -80,6 +80,7 @@ async def calculate_total(message: types.Message):
 
         await message.answer(
             f"💸 Итоговая сумма без учёта доставки: {total} ₽\n\n"
+            f"💱 Актуальный курс юаня (¥) {yuan_rate} ₽\n"
             f"🔹 Стоимость: ¥{yuan} × {yuan_rate} ₽ = {rub_no_fee} ₽\n"
             f"🔹 Комиссия: {fixed_fee} ₽\n\n"
             f"🚚 Условия доставки:\n"
