@@ -62,9 +62,9 @@ async def handle_category(message: types.Message):
     # Отправляем 3 картинки
     try:
         media = types.MediaGroup()
-        media.attach_photo(types.InputFile("order_price_1.jpg"))
         media.attach_photo(types.InputFile("order_price_2.jpg"))
         media.attach_photo(types.InputFile("order_price_3.jpg"))
+        media.attach_photo(types.InputFile("order_price_1.jpg"))
         await bot.send_media_group(message.chat.id, media)
     except Exception as e:
         logging.error(f"Ошибка при отправке изображений: {e}")
