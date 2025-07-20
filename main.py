@@ -103,15 +103,24 @@ async def handle_calc_step(message: types.Message):
         parse_mode="HTML"
     )
 
+    # Отменяем предыдущие обработчики, чтобы не накапливались
+    dp.unregister_message_handler(calc_price, state="*")
     dp.register_message_handler(
-        lambda msg: calc_price(msg, category),
+        calc_price,
+        state="*",
         content_types=types.ContentTypes.TEXT,
-        state=None
+        run_task=True
     )
+    # Сохраняем в FSM состояние категории для расчёта цены
+    await OrderStates.WaitingForYuan.set()
+    await dp.current_state(user=message.from_user.id).update_data(category=category)
 
-async def calc_price(message: types.Message, category: str):
+async def calc_price(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    category = data.get("category")
+    fee = CATEGORY_FEES.get(category, 0)
+
     try:
-        fee = CATEGORY_FEES[category]
         yuan = float(message.text.replace(",", "."))
         rub_no_fee = round(yuan * YUAN_RATE, 2)
         total = round(rub_no_fee + fee, 2)
@@ -134,12 +143,7 @@ async def calc_price(message: types.Message, category: str):
     except Exception as e:
         await message.answer("❗ Ошибка. Пожалуйста, введите корректную сумму.")
 
-class OrderStates(StatesGroup):
-    WaitingForPhoto = State()
-    WaitingForSize = State()
-    WaitingForCategory = State()
-    WaitingForYuan = State()
-    WaitingForContact = State()
+    await state.finish()  # Завершаем состояние после расчёта цены
 
 @dp.message_handler(lambda m: m.text == "🛍️ Оформление заказа")
 async def start_order(message: types.Message, state: FSMContext):
@@ -150,8 +154,10 @@ async def start_order(message: types.Message, state: FSMContext):
 @dp.message_handler(state=OrderStates.WaitingForPhoto, content_types=types.ContentTypes.PHOTO)
 async def order_photo(message: types.Message, state: FSMContext):
     await state.update_data(photo_id=message.photo[-1].file_id)
-    await message.answer("📏 Пришлите размер товара, например M или 44 (если размера нет, напишите 0):\n\n"
-                         "🔙 Напишите 'назад' чтобы вернуться к фото.")
+    await message.answer(
+        "📏 Пришлите размер товара, например M или 44 (если размера нет, напишите 0):\n\n"
+        "🔙 Напишите 'назад' чтобы вернуться к фото."
+    )
     await OrderStates.WaitingForSize.set()
 
 @dp.message_handler(state=OrderStates.WaitingForSize)
@@ -178,8 +184,10 @@ async def order_category(message: types.Message, state: FSMContext):
     except Exception as e:
         logging.warning(f"Ошибка при отправке фото: {e}")
 
-    await message.answer("💴 Введите стоимость товара в юанях (¥):\n\n"
-                         "🔙 Напишите 'назад' чтобы вернуться к выбору категории.")
+    await message.answer(
+        "💴 Введите стоимость товара в юанях (¥):\n\n"
+        "🔙 Напишите 'назад' чтобы вернуться к выбору категории."
+    )
     await OrderStates.WaitingForYuan.set()
 
 @dp.message_handler(state=OrderStates.WaitingForYuan)
@@ -216,7 +224,6 @@ async def order_yuan(message: types.Message, state: FSMContext):
 @dp.message_handler(state=OrderStates.WaitingForContact)
 async def order_contact(message: types.Message, state: FSMContext):
     if message.text.lower() == "назад":
-        # Вернуться к вводу цены товара
         await message.answer("💴 Введите стоимость товара в юанях (¥):")
         await OrderStates.WaitingForYuan.set()
         return
@@ -236,7 +243,6 @@ async def send_summary(message: types.Message, state: FSMContext):
         fee = CATEGORY_FEES[item["category"]]
 
         text += f"<b>Товар {idx}:</b>\n"
-        text += f"📸 Фото: (см. выше)\n"
         text += f"📏 Размер: {item['size']}\n"
         text += f"📂 Категория: {item['category']}\n"
         text += f"💴 Цена товара: ¥{yuan}\n"
@@ -255,10 +261,8 @@ async def send_summary(message: types.Message, state: FSMContext):
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("📤 Отправить заказ менеджеру", "➕ Добавить товар", "🔙 Вернуться в начало")
 
+    # Отправляем сообщение с кнопками
     await message.answer(text, parse_mode="HTML", reply_markup=markup)
-
-    # УБРАЛ ОТПРАВКУ В ГРУППУ ОТСЮДА!
-
 
 @dp.message_handler(lambda m: m.text == "📤 Отправить заказ менеджеру")
 async def finish_order(message: types.Message, state: FSMContext):
@@ -266,14 +270,15 @@ async def finish_order(message: types.Message, state: FSMContext):
     items = data.get("order_items", [])
     contact = data.get("contact", "Не указан")
 
-    text = "<b>📝 Ваш заказ:</b>\n\n"
+    text = "<b>📝 Новый заказ:</b>\n\n"
+    media = []
+
     for idx, item in enumerate(items, start=1):
         yuan = item["yuan"]
         rub = round(yuan * YUAN_RATE, 2)
         fee = CATEGORY_FEES[item["category"]]
 
         text += f"<b>Товар {idx}:</b>\n"
-        text += f"📸 Фото: (см. выше)\n"
         text += f"📏 Размер: {item['size']}\n"
         text += f"📂 Категория: {item['category']}\n"
         text += f"💴 Цена товара: ¥{yuan}\n"
@@ -287,13 +292,24 @@ async def finish_order(message: types.Message, state: FSMContext):
             text += f"<b>💸 Итог без доставки: {total} ₽</b>\n"
         text += "\n"
 
-    text += f"<b>📞 Контакт для связи:</b> {contact}"
+        media.append(InputMediaPhoto(media=item["photo_id"], caption=text if idx == 1 else None, parse_mode="HTML"))
 
-    # Отправка заказа в группу
+        # После первого фото текст с заказом будет в подписи, далее — без текста, чтобы не дублировать
+
+        text = ""  # Очистить текст, чтобы он не дублировался на остальных фото
+
+    text_contact = f"<b>📞 Контакт для связи:</b> {contact}"
+
+    # Отправляем сначала медиа группу с фото и текстом в подписи к первому фото
     try:
-        await bot.send_message(chat_id=GROUP_CHAT_ID, text=text, parse_mode="HTML")
+        if media:
+            await bot.send_media_group(chat_id=GROUP_CHAT_ID, media=media)
+        # Отдельным сообщением отправим контакт
+        await bot.send_message(chat_id=GROUP_CHAT_ID, text=text_contact, parse_mode="HTML")
     except Exception as e:
         logging.error(f"Ошибка отправки заказа в группу: {e}")
+        await message.answer("❗ Произошла ошибка при отправке заказа менеджеру. Попробуйте позже.")
+        return
 
     await message.answer(
         "<b>Спасибо за заказ!🤍</b>\nМенеджер скоро свяжется с Вами для подтверждения и оплаты.",
@@ -301,6 +317,16 @@ async def finish_order(message: types.Message, state: FSMContext):
         reply_markup=MAIN_MENU
     )
     await state.finish()
+
+@dp.message_handler(lambda m: m.text == "➕ Добавить товар")
+async def add_more(message: types.Message, state: FSMContext):
+    await message.answer("📸 Пришлите фото нового товара:")
+    await OrderStates.WaitingForPhoto.set()
+
+@dp.message_handler(lambda m: m.text == "🔙 Вернуться в начало")
+async def back_to_start(message: types.Message, state: FSMContext):
+    await state.finish()
+    await start(message)
 
 # --- WEB SERVER ---
 async def handle(request):
