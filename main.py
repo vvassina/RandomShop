@@ -226,7 +226,7 @@ async def order_contact(message: types.Message, state: FSMContext):
 
 async def send_summary(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    items = data["order_items"]
+    items = data.get("order_items", [])
     contact = data.get("contact", "Не указан")
 
     text = "<b>📝 Ваш заказ:</b>\n\n"
@@ -257,30 +257,50 @@ async def send_summary(message: types.Message, state: FSMContext):
 
     await message.answer(text, parse_mode="HTML", reply_markup=markup)
 
+    # УБРАЛ ОТПРАВКУ В ГРУППУ ОТСЮДА!
+
+
+@dp.message_handler(lambda m: m.text == "📤 Отправить заказ менеджеру")
+async def finish_order(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    items = data.get("order_items", [])
+    contact = data.get("contact", "Не указан")
+
+    text = "<b>📝 Ваш заказ:</b>\n\n"
+    for idx, item in enumerate(items, start=1):
+        yuan = item["yuan"]
+        rub = round(yuan * YUAN_RATE, 2)
+        fee = CATEGORY_FEES[item["category"]]
+
+        text += f"<b>Товар {idx}:</b>\n"
+        text += f"📸 Фото: (см. выше)\n"
+        text += f"📏 Размер: {item['size']}\n"
+        text += f"📂 Категория: {item['category']}\n"
+        text += f"💴 Цена товара: ¥{yuan}\n"
+        text += f"💰 Стоимость без учёта доставки: {rub} ₽\n"
+
+        if item["category"] == "Техника/Другое":
+            text += "❗ <i>Итоговую стоимость данного товара Вам напишет менеджер, такое считаем индивидуально.</i>\n"
+        else:
+            total = rub + fee
+            text += f"➕ Комиссия: {fee} ₽\n"
+            text += f"<b>💸 Итог без доставки: {total} ₽</b>\n"
+        text += "\n"
+
+    text += f"<b>📞 Контакт для связи:</b> {contact}"
+
     # Отправка заказа в группу
     try:
         await bot.send_message(chat_id=GROUP_CHAT_ID, text=text, parse_mode="HTML")
     except Exception as e:
         logging.error(f"Ошибка отправки заказа в группу: {e}")
 
-@dp.message_handler(lambda m: m.text == "📤 Отправить заказ менеджеру")
-async def finish_order(message: types.Message, state: FSMContext):
     await message.answer(
         "<b>Спасибо за заказ!🤍</b>\nМенеджер скоро свяжется с Вами для подтверждения и оплаты.",
         parse_mode="HTML",
         reply_markup=MAIN_MENU
     )
     await state.finish()
-
-@dp.message_handler(lambda m: m.text == "➕ Добавить товар")
-async def add_more(message: types.Message, state: FSMContext):
-    await message.answer("📸 Пришлите фото нового товара:")
-    await OrderStates.WaitingForPhoto.set()
-
-@dp.message_handler(lambda m: m.text == "🔙 Вернуться в начало")
-async def back_to_start(message: types.Message, state: FSMContext):
-    await state.finish()
-    await start(message)
 
 # --- WEB SERVER ---
 async def handle(request):
