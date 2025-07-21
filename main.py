@@ -74,8 +74,9 @@ async def start(message: types.Message):
 async def handle_calc_category(message: types.Message):
     await message.answer("🗂️ Выберите категорию товара:", reply_markup=CATEGORY_MENU)
 
-@dp.message_handler(lambda m: m.text in CATEGORY_FEES)
+@dp.message_handler(lambda m: m.text in CATEGORY_FEES, state=None)
 async def handle_calc_step(message: types.Message):
+
     category = message.text
     fee = CATEGORY_FEES[category]
 
