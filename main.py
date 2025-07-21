@@ -319,6 +319,21 @@ async def back_to_start(message: types.Message, state: FSMContext):
     await state.finish()
     await start(message)
 
+# Гарантированная обработка кнопок вне зависимости от текущего состояния FSM
+
+@dp.message_handler(lambda m: m.text == "📤 Отправить заказ менеджеру", state="*")
+async def finish_order_handler(message: types.Message, state: FSMContext):
+    await finish_order(message, state)
+
+@dp.message_handler(lambda m: m.text == "➕ Добавить товар", state="*")
+async def add_more_handler(message: types.Message, state: FSMContext):
+    await add_more(message, state)
+
+@dp.message_handler(lambda m: m.text == "🔙 Вернуться в начало", state="*")
+async def back_to_start_handler(message: types.Message, state: FSMContext):
+    await back_to_start(message, state)
+
+
 
 # --- WEB SERVER ---
 async def handle(request):
