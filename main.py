@@ -198,6 +198,14 @@ async def order_yuan(message: types.Message, state: FSMContext):
     order_items.append(new_item)
     await state.update_data(order_items=order_items)
 
+# Очищаем временные поля текущего товара
+await state.update_data(
+    photo_id=None,
+    size=None,
+    category=None,
+    yuan=None,
+)
+
     if "contact" not in data:
         await message.answer("📱 Напишите Ваш никнейм в Telegram или номер телефона:")
         await OrderStates.WaitingForContact.set()
@@ -328,8 +336,21 @@ async def finish_order(message: types.Message, state: FSMContext):
 
 @dp.message_handler(lambda m: m.text == "➕ Добавить товар")
 async def add_more(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    order_items = data.get("order_items", [])
+    
+    # Очищаем данные текущего товара
+    await state.update_data(
+        photo_id=None,
+        size=None,
+        category=None,
+        yuan=None,
+        order_items=order_items
+    )
+    
     await message.answer("📸 Пришлите фото нового товара:")
     await OrderStates.WaitingForPhoto.set()
+
 
 @dp.message_handler(lambda m: m.text == "🔙 Вернуться в начало")
 async def back_to_start(message: types.Message, state: FSMContext):
