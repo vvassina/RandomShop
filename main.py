@@ -283,7 +283,9 @@ async def send_summary(message: types.Message, state: FSMContext):
 
     # Кнопки
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("📤 Отправить заказ менеджеру", "➕ Добавить товар", "🔙 Вернуться в начало")
+    markup.row("📤 Отправить заказ менеджеру")
+    markup.row("➕ Добавить товар", "🔙 Вернуться в начало")
+
 
     await message.answer(text, parse_mode="HTML", reply_markup=markup)
     await OrderStates.WaitingForAction.set()  # <-- ВСТАВЬ ЭТУ СТРОКУ
