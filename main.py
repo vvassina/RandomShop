@@ -198,18 +198,18 @@ async def order_yuan(message: types.Message, state: FSMContext):
     order_items.append(new_item)
     await state.update_data(order_items=order_items)
 
-# Очищаем временные поля текущего товара
-await state.update_data(
-    photo_id=None,
-    size=None,
-    category=None,
-    yuan=None,
-)
+    # Очищаем временные поля, чтобы следующий товар не наследовал их
+    await state.update_data(
+        photo_id=None,
+        size=None,
+        category=None,
+        yuan=None,
+    )
 
-if "contact" not in data:
+    if "contact" not in data:
         await message.answer("📱 Напишите Ваш никнейм в Telegram или номер телефона:")
         await OrderStates.WaitingForContact.set()
-else:
+    else:
         await send_summary(message, state)
 
 # Гарантированная обработка кнопок вне зависимости от текущего состояния FSM
