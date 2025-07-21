@@ -206,9 +206,13 @@ async def order_yuan(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=OrderStates.WaitingForContact)
 async def order_contact(message: types.Message, state: FSMContext):
+    forbidden = ["назад", "🔙 Вернуться в начало", "➕ Добавить товар", "📤 Отправить заказ менеджеру"]
     if message.text.lower() == "назад":
         await message.answer("💴 Введите стоимость товара в юанях (¥):")
         await OrderStates.WaitingForYuan.set()
+        return
+    if message.text in forbidden:
+        await message.answer("❗ Пожалуйста, введите ваш контакт (никнейм или телефон), а не используйте кнопки.")
         return
 
     await state.update_data(contact=message.text)
@@ -332,6 +336,12 @@ async def add_more_handler(message: types.Message, state: FSMContext):
 @dp.message_handler(lambda m: m.text == "🔙 Вернуться в начало", state="*")
 async def back_to_start_handler(message: types.Message, state: FSMContext):
     await back_to_start(message, state)
+
+@dp.message_handler(lambda m: m.text == "🔙 Вернуться в начало", state="*")
+async def back_to_start_handler(message: types.Message, state: FSMContext):
+    await state.finish()
+    await start(message)
+
 
 
 
