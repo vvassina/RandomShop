@@ -50,6 +50,7 @@ class OrderStates(StatesGroup):
     WaitingForCategory = State()
     WaitingForYuan = State()
     WaitingForContact = State()
+    WaitingForAction = State ()
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
     try:
@@ -285,6 +286,8 @@ async def send_summary(message: types.Message, state: FSMContext):
     markup.add("📤 Отправить заказ менеджеру", "➕ Добавить товар", "🔙 Вернуться в начало")
 
     await message.answer(text, parse_mode="HTML", reply_markup=markup)
+    await OrderStates.WaitingForAction.set()  # <-- ВСТАВЬ ЭТУ СТРОКУ
+
 @dp.message_handler(lambda m: m.text == "📤 Отправить заказ менеджеру")
 async def finish_order(message: types.Message, state: FSMContext):
     data = await state.get_data()
