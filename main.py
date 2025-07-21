@@ -204,6 +204,20 @@ async def order_yuan(message: types.Message, state: FSMContext):
     else:
         await send_summary(message, state)
 
+# Гарантированная обработка кнопок вне зависимости от текущего состояния FSM
+
+@dp.message_handler(lambda m: m.text == "📤 Отправить заказ менеджеру", state="*")
+async def finish_order_handler(message: types.Message, state: FSMContext):
+    await finish_order(message, state)
+
+@dp.message_handler(lambda m: m.text == "➕ Добавить товар", state="*")
+async def add_more_handler(message: types.Message, state: FSMContext):
+    await add_more(message, state)
+
+@dp.message_handler(lambda m: m.text == "🔙 Вернуться в начало", state="*")
+async def back_to_start_handler(message: types.Message, state: FSMContext):
+    await back_to_start(message, state)
+
 @dp.message_handler(state=OrderStates.WaitingForContact)
 async def order_contact(message: types.Message, state: FSMContext):
     forbidden = ["назад", "🔙 Вернуться в начало", "➕ Добавить товар", "📤 Отправить заказ менеджеру"]
@@ -312,7 +326,6 @@ async def finish_order(message: types.Message, state: FSMContext):
     )
     await state.finish()
 
-
 @dp.message_handler(lambda m: m.text == "➕ Добавить товар")
 async def add_more(message: types.Message, state: FSMContext):
     await message.answer("📸 Пришлите фото нового товара:")
@@ -322,27 +335,6 @@ async def add_more(message: types.Message, state: FSMContext):
 async def back_to_start(message: types.Message, state: FSMContext):
     await state.finish()
     await start(message)
-
-# Гарантированная обработка кнопок вне зависимости от текущего состояния FSM
-
-@dp.message_handler(lambda m: m.text == "📤 Отправить заказ менеджеру", state="*")
-async def finish_order_handler(message: types.Message, state: FSMContext):
-    await finish_order(message, state)
-
-@dp.message_handler(lambda m: m.text == "➕ Добавить товар", state="*")
-async def add_more_handler(message: types.Message, state: FSMContext):
-    await add_more(message, state)
-
-@dp.message_handler(lambda m: m.text == "🔙 Вернуться в начало", state="*")
-async def back_to_start_handler(message: types.Message, state: FSMContext):
-    await back_to_start(message, state)
-
-@dp.message_handler(lambda m: m.text == "🔙 Вернуться в начало", state="*")
-async def back_to_start_handler(message: types.Message, state: FSMContext):
-    await state.finish()
-    await start(message)
-
-
 
 
 # --- WEB SERVER ---
