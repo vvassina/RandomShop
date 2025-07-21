@@ -206,7 +206,7 @@ await state.update_data(
     yuan=None,
 )
 
-    if "contact" not in data:
+ if "contact" not in data:
         await message.answer("📱 Напишите Ваш никнейм в Telegram или номер телефона:")
         await OrderStates.WaitingForContact.set()
     else:
