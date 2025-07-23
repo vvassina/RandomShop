@@ -71,15 +71,20 @@ async def start(message: types.Message):
 
 # ================== РАСЧЁТ ===================
 
+class CalcStates(StatesGroup):
+    WaitingForCategory = State()
+    WaitingForYuan = State()
+)
+
 @dp.message_handler(lambda m: m.text == "💴 Расчёт стоимости заказа")
-async def handle_calc_category(message: types.Message):
+async def start_calc(message: types.Message, state: FSMContext):
     await message.answer("🗂️ Выберите категорию товара:", reply_markup=CATEGORY_MENU)
+    await CalcStates.WaitingForCategory.set()
 
-@dp.message_handler(lambda m: m.text in CATEGORY_FEES, state=None)
-async def handle_calc_step(message: types.Message):
-
+@dp.message_handler(lambda m: m.text in CATEGORY_FEES, state=CalcStates.WaitingForCategory)
+async def calc_category_chosen(message: types.Message, state: FSMContext):
     category = message.text
-    fee = CATEGORY_FEES[category]
+    await state.update_data(category=category)
 
     if category == "Техника/Другое":
         await message.answer(
@@ -88,6 +93,7 @@ async def handle_calc_step(message: types.Message):
                 InlineKeyboardButton("Менеджер", url="https://t.me/dadmaksi")
             )
         )
+        await state.finish()
         return
 
     try:
@@ -99,19 +105,14 @@ async def handle_calc_step(message: types.Message):
     except Exception as e:
         logging.warning(f"Ошибка при отправке фото: {e}")
 
-    await message.answer(
-        f"💴 Введите стоимость товара в юанях (¥) для категории <b>{category}</b>:",
-        parse_mode="HTML"
-    )
+    await message.answer("💴 Введите стоимость товара в юанях (¥):")
+    await CalcStates.WaitingForYuan.set()
 
-    dp.register_message_handler(
-        lambda msg: calc_price(msg, category),
-        content_types=types.ContentTypes.TEXT,
-        state=None
-    )
-
-async def calc_price(message: types.Message, category: str):
+@dp.message_handler(state=CalcStates.WaitingForYuan)
+async def calc_price_final(message: types.Message, state: FSMContext):
     try:
+        data = await state.get_data()
+        category = data["category"]
         fee = CATEGORY_FEES[category]
         yuan = float(message.text.replace(",", "."))
         rub_no_fee = round(yuan * YUAN_RATE, 2)
@@ -132,8 +133,11 @@ async def calc_price(message: types.Message, category: str):
             reply_markup=markup,
             parse_mode="HTML"
         )
-    except Exception:
-        await message.answer("❗ Ошибка. Пожалуйста, введите корректную сумму.")
+        await state.finish()
+    except:
+        await message.answer("❗ Введите корректную сумму в юанях.")
+
+
 @dp.message_handler(lambda m: m.text == "🛍️ Оформление заказа")
 async def start_order(message: types.Message, state: FSMContext):
     await state.update_data(order_items=[])
