@@ -74,7 +74,6 @@ async def start(message: types.Message):
 class CalcStates(StatesGroup):
     WaitingForCategory = State()
     WaitingForYuan = State()
-)
 
 @dp.message_handler(lambda m: m.text == "💴 Расчёт стоимости заказа")
 async def start_calc(message: types.Message, state: FSMContext):
