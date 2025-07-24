@@ -85,8 +85,9 @@ async def calc_category_chosen(message: types.Message, state: FSMContext):
     category = message.text
     await state.update_data(category=category)
 
-if category == "Техника/Другое":
-    await message.answer(
+    if category == "Техника/Другое":
+       
+       await message.answer(
         "❗ Такое считаем индивидуально, напишите нашему менеджеру 😊",
         reply_markup=InlineKeyboardMarkup().add(
             InlineKeyboardButton("Менеджер", url="https://t.me/dadmaksi")
