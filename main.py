@@ -85,15 +85,19 @@ async def calc_category_chosen(message: types.Message, state: FSMContext):
     category = message.text
     await state.update_data(category=category)
 
-    if category == "Техника/Другое":
-        await message.answer(
-            "❗ Такое считаем индивидуально, напишите нашему менеджеру 😊",
-            reply_markup=InlineKeyboardMarkup().add(
-                InlineKeyboardButton("Менеджер", url="https://t.me/dadmaksi")
-            )
+if category == "Техника/Другое":
+    await message.answer(
+        "❗ Такое считаем индивидуально, напишите нашему менеджеру 😊",
+        reply_markup=InlineKeyboardMarkup().add(
+            InlineKeyboardButton("Менеджер", url="https://t.me/dadmaksi")
         )
-        await state.finish()
-        return
+    )
+
+    # Добавляем основные кнопки после сообщения
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("🛍️ Оформление заказа", "🔙 Вернуться в начало")
+    await message.answer("Вы можете продолжить оформление заказа или вернуться в начало:", reply_markup=markup)
+    return
 
     try:
         media = types.MediaGroup()
