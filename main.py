@@ -142,7 +142,7 @@ async def calc_price_final(message: types.Message, state: FSMContext):
         await message.answer("❗ Введите корректную сумму в юанях.")
 
 
-@dp.message_handler(lambda m: m.text == "🛍️ Оформление заказа")
+@dp.message_handler(lambda m: m.text == "🛍️ Оформление заказа", state="*")
 async def start_order(message: types.Message, state: FSMContext):
     await state.update_data(order_items=[])
     await message.answer("📸 Пришлите фото товара:")
