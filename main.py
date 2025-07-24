@@ -96,8 +96,8 @@ async def calc_category_chosen(message: types.Message, state: FSMContext):
 
     # Добавляем основные кнопки после сообщения
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("🛍️ Оформление заказа", "🔙 Вернуться в начало")
-    await message.answer("Вы можете продолжить оформление заказа или вернуться в начало:", reply_markup=markup)
+    markup.add("🔙 Вернуться в начало")
+    await message.answer("Вернуться в главное меню:", reply_markup=markup)
     return
 
     try:
@@ -142,7 +142,7 @@ async def calc_price_final(message: types.Message, state: FSMContext):
         await message.answer("❗ Введите корректную сумму в юанях.")
 
 
-@dp.message_handler(lambda m: m.text == "🛍️ Оформление заказа", state="*")
+@dp.message_handler(lambda m: m.text == "🛍️ Оформление заказа")
 async def start_order(message: types.Message, state: FSMContext):
     await state.update_data(order_items=[])
     await message.answer("📸 Пришлите фото товара:")
