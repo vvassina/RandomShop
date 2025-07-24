@@ -86,20 +86,21 @@ async def calc_category_chosen(message: types.Message, state: FSMContext):
     await state.update_data(category=category)
 
     if category == "Техника/Другое":
-       
-       await message.answer(
-        "❗ Такое считаем индивидуально, напишите нашему менеджеру 😊",
-        reply_markup=InlineKeyboardMarkup().add(
-            InlineKeyboardButton("Менеджер", url="https://t.me/dadmaksi")
+        await message.answer(
+            "❗ Такое считаем индивидуально, напишите нашему менеджеру 😊",
+            reply_markup=InlineKeyboardMarkup().add(
+                InlineKeyboardButton("Менеджер", url="https://t.me/dadmaksi")
+            )
         )
-    )
 
-    # Добавляем основные кнопки после сообщения
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("🔙 Вернуться в начало")
-    await message.answer("Вернуться в главное меню:", reply_markup=markup)
-    return
+        markup = ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add("🛍️ Оформление заказа", "🔙 Вернуться в начало")
+        await message.answer("Вы можете продолжить оформление заказа или вернуться в начало:", reply_markup=markup)
 
+        await state.finish()  # Завершаем расчёт
+        return
+
+    # Если категория не "Техника/Другое", продолжаем расчёт
     try:
         media = types.MediaGroup()
         media.attach_photo(types.InputFile("order_price_1.jpg"))
