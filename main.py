@@ -25,7 +25,8 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 logging.basicConfig(level=logging.INFO)
 
-CATEGORY_FEES = {
+# ------- Комиссия (ваша текущая "комиссия") -------
+CATEGORY_COMMISSION = {
     "Обувь/Куртки": 1000,
     "Джинсы/Кофты": 800,
     "Штаны/Юбки/Платья": 600,
@@ -35,13 +36,25 @@ CATEGORY_FEES = {
     "Техника/Другое": 0
 }
 
+# ------- Доставка от Китая до Владивостока (фиксированная по категориям) -------
+CATEGORY_DELIVERY = {
+    "Обувь/Куртки": 1200,
+    "Джинсы/Кофты": 950,
+    "Штаны/Юбки/Платья": 800,
+    "Футболки/Аксессуары": 700,
+    "Часы/Украшения": 1000,
+    "Сумки/Рюкзаки": 1000,
+    "Техника/Другое": 0  # техника считается индивидуально
+}
+
 MAIN_MENU = ReplyKeyboardMarkup(resize_keyboard=True).add(
     KeyboardButton("💴 Расчёт стоимости заказа"),
     KeyboardButton("🛍️ Оформление заказа")
 )
 
+# Категории берём из ключей словаря комиссии (они совпадают с доставкой)
 CATEGORY_MENU = ReplyKeyboardMarkup(resize_keyboard=True).add(*[
-    KeyboardButton(cat) for cat in CATEGORY_FEES
+    KeyboardButton(cat) for cat in CATEGORY_COMMISSION
 ])
 
 class OrderStates(StatesGroup):
@@ -50,7 +63,8 @@ class OrderStates(StatesGroup):
     WaitingForCategory = State()
     WaitingForYuan = State()
     WaitingForContact = State()
-    WaitingForAction = State ()
+    WaitingForAction = State()
+
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
     try:
@@ -80,7 +94,7 @@ async def start_calc(message: types.Message, state: FSMContext):
     await message.answer("🗂️ Выберите категорию товара:", reply_markup=CATEGORY_MENU)
     await CalcStates.WaitingForCategory.set()
 
-@dp.message_handler(lambda m: m.text in CATEGORY_FEES, state=CalcStates.WaitingForCategory)
+@dp.message_handler(lambda m: m.text in CATEGORY_COMMISSION, state=CalcStates.WaitingForCategory)
 async def calc_category_chosen(message: types.Message, state: FSMContext):
     category = message.text
     await state.update_data(category=category)
@@ -118,23 +132,23 @@ async def calc_price_final(message: types.Message, state: FSMContext):
     try:
         data = await state.get_data()
         category = data["category"]
-        fee = CATEGORY_FEES[category]
+        commission = CATEGORY_COMMISSION[category]
+        delivery = CATEGORY_DELIVERY[category]
         yuan = float(message.text.replace(",", "."))
-        rub_no_fee = round(yuan * YUAN_RATE, 2)
-        total = round(rub_no_fee + fee, 2)
+        rub_price = round(yuan * YUAN_RATE, 2)
+        total = round(rub_price + commission + delivery, 2)
 
         markup = ReplyKeyboardMarkup(resize_keyboard=True)
         markup.add("🛍️ Оформление заказа", "🔙 Вернуться в начало")
 
         await message.answer(
-            f"<b>💸 Итоговая сумма без учёта доставки: {total} ₽</b> 🔥\n\n"
+            f"<b>💸 Итоговая сумма (товар + комиссия + доставка): {total} ₽</b> 🔥\n\n"
             f"💱 <b>Актуальный курс юаня (¥): {YUAN_RATE} ₽</b>\n"
             f"◾ Стоимость товара:\n"
-            f"      ¥{yuan} × {YUAN_RATE} ₽ = {rub_no_fee} ₽\n"
-            f"◾ Комиссия: {fee} ₽\n\n"
-            f"🚚 <i>Условия доставки:</i>\n"
-            f"600₽/кг до Владивостока, далее по тарифу CDEK/Почты России.\n\n"
-            f"📦 Точную стоимость доставки скажет менеджер, когда заказ прибудет во Владивосток!\n\n"
+            f"      ¥{yuan} × {YUAN_RATE} ₽ = {rub_price} ₽\n"
+            f"◾ Комиссия: {commission} ₽\n"
+            f"◾ Доставка (Китай → Владивосток) по категории: {delivery} ₽\n\n"
+            f"📦  <b>Дополнительно<b>: после прибытия заказа  во Владивосток применяются тарифы CDEK/Почты России для внутренней доставки —  <b>эта сумма оплачивается отдельно по факту, если нужна доставка дальше<b>🫶🏼.\n\n"
             f"<b>💬 Связь с менеджером:</b> <a href='https://t.me/dadmaksi'>@dadmaksi</a>",
             reply_markup=markup,
             parse_mode="HTML"
@@ -143,6 +157,8 @@ async def calc_price_final(message: types.Message, state: FSMContext):
     except:
         await message.answer("❗ Введите корректную сумму в юанях.")
 
+
+# ================== ОФОРМЛЕНИЕ ЗАКАЗА ===================
 
 @dp.message_handler(lambda m: m.text == "🛍️ Оформление заказа")
 async def start_order(message: types.Message, state: FSMContext):
@@ -168,7 +184,7 @@ async def order_size(message: types.Message, state: FSMContext):
     await message.answer("🧷 Выберите категорию товара:", reply_markup=CATEGORY_MENU)
     await OrderStates.WaitingForCategory.set()
 
-@dp.message_handler(lambda m: m.text in CATEGORY_FEES, state=OrderStates.WaitingForCategory)
+@dp.message_handler(lambda m: m.text in CATEGORY_COMMISSION, state=OrderStates.WaitingForCategory)
 async def order_category(message: types.Message, state: FSMContext):
     await state.update_data(category=message.text)
 
@@ -259,11 +275,13 @@ async def send_summary(message: types.Message, state: FSMContext):
 
     text = "<b>📝 Ваш заказ:</b>\n\n"
     media = []
+    grand_total = 0.0  # общая сумма по всем товарам (товар+комиссия+доставка)
 
     for idx, item in enumerate(items, start=1):
         yuan = item["yuan"]
         rub = round(yuan * YUAN_RATE, 2)
-        fee = CATEGORY_FEES[item["category"]]
+        commission = CATEGORY_COMMISSION[item["category"]]
+        delivery = CATEGORY_DELIVERY[item["category"]]
 
         text += f"<b>Товар {idx}:</b>\n"
         text += f"📏 Размер: {item['size']}\n"
@@ -273,14 +291,19 @@ async def send_summary(message: types.Message, state: FSMContext):
 
         if item["category"] == "Техника/Другое":
             text += "❗ <i>Итоговую стоимость данного товара Вам напишет менеджер, такое считаем индивидуально.</i>\n"
+            # не добавляем в grand_total, менеджер скажет отдельно
         else:
-            total = rub + fee
-            text += f"➕ Комиссия: {fee} ₽\n"
-            text += f"<b>💸 Итог без доставки: {total} ₽</b>\n"
+            total = round(rub + commission + delivery, 2)
+            grand_total += total
+            text += f"➕ Комиссия: {commission} ₽\n"
+            text += f"🚚 Доставка (Китай → Владивосток): {delivery} ₽\n"
+            text += f"<b>💸 Итог по этому товару: {total} ₽</b>\n"
 
         text += "\n"
-
         media.append(types.InputMediaPhoto(item["photo_id"]))
+
+    if grand_total:
+        text += f"\n<b>🧾 Общая сумма по товарам (без индивидуальной техники): {round(grand_total, 2)} ₽</b>\n\n"
 
     text += f"<b>📞 Контакт для связи:</b> {contact}"
 
@@ -296,9 +319,8 @@ async def send_summary(message: types.Message, state: FSMContext):
     markup.row("📤 Отправить заказ менеджеру")
     markup.row("➕ Добавить товар", "🔙 Вернуться в начало")
 
-
     await message.answer(text, parse_mode="HTML", reply_markup=markup)
-    await OrderStates.WaitingForAction.set()  # <-- ВСТАВЬ ЭТУ СТРОКУ
+    await OrderStates.WaitingForAction.set()
 
 @dp.message_handler(lambda m: m.text == "📤 Отправить заказ менеджеру")
 async def finish_order(message: types.Message, state: FSMContext):
@@ -308,11 +330,13 @@ async def finish_order(message: types.Message, state: FSMContext):
 
     text = "<b>📝 Новый заказ от клиента:</b>\n\n"
     media = []
+    grand_total = 0.0
 
     for idx, item in enumerate(items, start=1):
         yuan = item["yuan"]
         rub = round(yuan * YUAN_RATE, 2)
-        fee = CATEGORY_FEES[item["category"]]
+        commission = CATEGORY_COMMISSION[item["category"]]
+        delivery = CATEGORY_DELIVERY[item["category"]]
 
         text += f"<b>Товар {idx}:</b>\n"
         text += f"📏 Размер: {item['size']}\n"
@@ -323,12 +347,17 @@ async def finish_order(message: types.Message, state: FSMContext):
         if item["category"] == "Техника/Другое":
             text += "❗ <i>Итоговую стоимость данного товара нужно рассчитать индивидуально.</i>\n"
         else:
-            total = rub + fee
-            text += f"➕ Комиссия: {fee} ₽\n"
-            text += f"<b>💸 Итог без доставки: {total} ₽</b>\n"
+            total = round(rub + commission + delivery, 2)
+            grand_total += total
+            text += f"➕ Комиссия: {commission} ₽\n"
+            text += f"🚚 Доставка (Китай → Владивосток): {delivery} ₽\n"
+            text += f"<b>💸 Итог по этому товару: {total} ₽</b>\n"
         text += "\n"
 
         media.append(types.InputMediaPhoto(item["photo_id"]))
+
+    if grand_total:
+        text += f"\n<b>🧾 Общая сумма по товарам (без индивидуальной техники): {round(grand_total, 2)} ₽</b>\n\n"
 
     text += f"<b>📞 Контакт клиента:</b> {contact}"
 
