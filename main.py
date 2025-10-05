@@ -362,6 +362,12 @@ async def back_to_start(message: types.Message, state: FSMContext):
     await state.finish()
     await start(message)
 
+@dp.message_handler(lambda m: m.text == "🔙 Вернуться в начало", state="*")
+async def back_to_start_global(message: types.Message, state: FSMContext):
+    await state.finish()
+    await start(message)
+
+
 # ====== WEB SERVER ======
 async def handle(request):
     return web.Response(text="Bot is running")
