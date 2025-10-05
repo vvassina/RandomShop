@@ -145,7 +145,7 @@ async def calc_price_final(message: types.Message, state: FSMContext):
             f"      ¥{yuan} × {YUAN_RATE} ₽ = {rub_price} ₽\n"
             f"◾ Комиссия: {commission} ₽\n"
             f"◾ Доставка: {delivery} ₽\n"
-            f"      (Китай → Владивосток)\n"
+            f"      (Китай → Владивосток)\n\n"
             f"📦  <b>Дополнительно</b>: после прибытия заказа во Владивосток применяются тарифы CDEK/Почты России для внутренней доставки — <b>эта сумма оплачивается отдельно по факту</b>🫶🏼\n\n"
             f"<b>💬 Связь с менеджером:</b> <a href='https://t.me/dadmaksi'>@dadmaksi</a>",
             reply_markup=markup,
@@ -281,7 +281,7 @@ async def send_summary(message: types.Message, state: FSMContext):
         media.append(types.InputMediaPhoto(item["photo_id"]))
 
     if grand_total:
-        text += f"\n<b>🧾 Общая сумма по товарам: {round(grand_total, 2)} ₽</b>\n\n"
+        text += f"\n<b>🧾 Общая сумма по товарам: {round(grand_total, 2)} ₽</b>i'm\n"
 
     text += f"<b>📞 Контакт для связи:</b> {contact}"
 
@@ -331,7 +331,7 @@ async def finish_order(message: types.Message, state: FSMContext):
         media.append(types.InputMediaPhoto(item["photo_id"]))
 
     if grand_total:
-        text += f"\n<b>🧾 Общая сумма по товарам (без индивидуальной техники): {round(grand_total, 2)} ₽</b>\n\n"
+        text += f"\n<b>🧾 Общая сумма по товарам (без индивидуальной техники): {round(grand_total, 2)} ₽</b>\n"
 
     text += f"<b>📞 Контакт клиента:</b> {contact}"
 
