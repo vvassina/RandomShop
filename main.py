@@ -281,7 +281,7 @@ async def send_summary(message: types.Message, state: FSMContext):
         media.append(types.InputMediaPhoto(item["photo_id"]))
 
     if grand_total:
-        text += f"\n<b>🧾 Общая сумма заказа: {round(grand_total, 2)} ₽</b>\n"
+        text += f"<b>🧾 Общая сумма заказа: {round(grand_total, 2)} ₽</b>\n"
 
     text += f"<b>📞 Контакт для связи:</b> {contact}"
 
