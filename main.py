@@ -265,8 +265,8 @@ async def send_summary(message: types.Message, state: FSMContext):
         text += f"<b>Товар {idx}:</b>\n"
         text += f"📏 Размер: {item['size']}\n"
         text += f"📂 Категория: {item['category']}\n"
-        text += f"💴 Цена товара: ¥{yuan}\n"
-        text += f"💰 Стоимость товара в рублях: {rub} ₽\n"
+        text += f"💴 Стоимость товара: ¥{yuan}\n"
+        text += f"💰 Цена товара в рублях: {rub} ₽\n"
 
         if item["category"] != "Техника/Другое":
             total = round(rub + commission + delivery, 2)
