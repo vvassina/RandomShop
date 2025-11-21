@@ -384,7 +384,14 @@ async def start_webserver():
     await site.start()
 
 # ====== MAIN ======
+async def set_bot_commands(bot: Bot):
+    commands = [
+        types.BotCommand(command="start", description="Перезапуск")
+    ]
+    await bot.set_my_commands(commands)
+
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.create_task(start_webserver())
+    loop.run_until_complete(set_bot_commands(bot))  # ← ДОБАВИЛИ ВЫЗОВ КОМАНД
     executor.start_polling(dp, skip_updates=True)
